@@ -121,7 +121,7 @@ class DimInfos:
     # with the order of a subset of the indices adjusted to match
     # the tile layout of the tensor on the device.  This
     # function computes that reordering
-    def get_tensor_op_index_order(self, tensor, op):
+    def get_tensor_op_index_order(self, tensor):
         dim_indices = self.dim_indices  # op dimension order
 
         dev_dim_order = tensor["device_layout"].dim_map[::-1][1:]
@@ -166,7 +166,7 @@ class DimInfos:
     def get_tensor_op_infos(self, tensor, op):
         result = self.make_dim_infos(
             additional_rows={"scale": get_scales_sdsc_format(tensor, op)},
-            index_order=self.get_tensor_op_index_order(tensor, op),
+            index_order=self.get_tensor_op_index_order(tensor),
         )
         return result
 
