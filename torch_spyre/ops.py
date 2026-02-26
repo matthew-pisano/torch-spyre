@@ -41,19 +41,19 @@ def spyre__mm_out(
 def spyre__linear(
     input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor | None = None
 ) -> torch.Tensor:
+    weight = weight.to("cpu")
+    weight = weight.transpose(-1, -2).contiguous()
+    while weight.dim() < input.dim():
+        weight = torch.unsqueeze(weight, 0)
+    
     def _linear(input, weight, bias):
-        weight = weight.to("cpu")
-        weight = weight.transpose(-1, -2).contiguous()
-        while weight.dim() < input.dim():
-            weight = torch.unsqueeze(weight, 0)
-
-        out = input @ weight.to("spyre")
+        out = input @ weight
         if bias:
             out += bias
         return out
 
-    compiled_linear = torch.compile(_linear)
-    return compiled_linear(input, weight, bias)
+    compiled_linear = torch.compile(_linear, dynamic=False)
+    return compiled_linear(input, weight.to("spyre"), bias)
 
 
 @torch.library.register_kernel("aten::addmm", ["spyre"])  # type:ignore
