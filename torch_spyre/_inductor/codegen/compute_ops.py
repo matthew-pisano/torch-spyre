@@ -126,12 +126,10 @@ class DimInfos:
 
         dev_dim_order = tensor["device_layout"].dim_map[::-1][1:]
         missing_dims = list(set(dim_indices) - set(dev_dim_order))
-        # HACK: avoid special case handling for batchmatmul
         if (
-            len(missing_dims) > 0
+            len(missing_dims) == 1
             and len(dim_indices) >= 3
             and tensor["scale"][0] == -1
-            and op != "batchmatmul"
         ):
             if missing_dims[0] == 0:
                 # Add missing dimensions to end of device dimension order
