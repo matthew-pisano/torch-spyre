@@ -41,12 +41,10 @@ def spyre__mm_out(
 def spyre__linear(
     input: torch.Tensor, weight: torch.Tensor, bias: torch.Tensor | None = None
 ) -> torch.Tensor:
-    weight = weight.to("cpu")
-    weight = weight.transpose(-1, -2).contiguous()
-    while weight.dim() < input.dim():
-        weight = torch.unsqueeze(weight, 0)
-    
     def _linear(input, weight, bias):
+        weight = weight.transpose(-1, -2).contiguous()
+        while weight.dim() < input.dim():
+            weight = torch.unsqueeze(weight, 0)
         out = input @ weight
         if bias:
             out += bias
