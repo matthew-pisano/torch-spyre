@@ -10,7 +10,7 @@ requires = [
     "numpy",
     "pyyaml", # needed for codegen
     "regex",
-    "setuptools>=70.1.0,<80.0",
+    "setuptools>=70.1.0,<83.0",
     "torch~=2.10.0",
 #    "torch>=2.10.0",
     "wheel"
@@ -45,7 +45,7 @@ build = [ # no-isolation build
     "numpy",
     "pyyaml", # needed for codegen
     "regex",
-    "setuptools>=70.1.0,<80.0",
+    "setuptools>=70.1.0,<83.0",
     "torch~=2.10.0",
 #    "torch>=2.10.0",
     "wheel"
@@ -98,7 +98,7 @@ filterwarnings = [
 [tool.uv]
 required-version = ">=0.9.0"
 index-strategy = "unsafe-best-match"
-override-dependencies = ['setuptools>=70.1.0,<80.0']
+override-dependencies = ['setuptools>=70.1.0,<83.0']
 
 [tool.uv.sources]
 torch = [
