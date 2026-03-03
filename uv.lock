@@ -7,7 +7,7 @@ resolution-markers = [
 ]
 
 [manifest]
-overrides = [{ name = "setuptools", specifier = ">=70.1.0,<80.0" }]
+overrides = [{ name = "setuptools", specifier = ">=70.1.0,<83.0" }]
 
 [[package]]
 name = "build"
@@ -1022,7 +1022,7 @@ requires-dist = [
     { name = "pyyaml", marker = "extra == 'build'" },
     { name = "regex" },
     { name = "regex", marker = "extra == 'build'" },
-    { name = "setuptools", marker = "extra == 'build'", specifier = ">=70.1.0,<80.0" },
+    { name = "setuptools", marker = "extra == 'build'", specifier = ">=70.1.0,<83.0" },
     { name = "torch", specifier = "~=2.10.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "torch", marker = "extra == 'build'", specifier = "~=2.10.0", index = "https://download.pytorch.org/whl/cpu" },
     { name = "transformers", marker = "extra == 'test'", specifier = "~=4.57.1" },
