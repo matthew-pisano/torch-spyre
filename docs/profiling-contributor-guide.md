@@ -7,43 +7,64 @@
 
 ## Overview
 
-We work directly on the torch-spyre repository (no fork). Each developer creates a short-lived branch for their task and opens a PR directly into `main`.
+We use a **fork-based** workflow. Each developer maintains a personal fork of
+the upstream repository, creates task branches on their fork, and opens PRs
+from the fork into upstream `main`.
 
-| Branch | Purpose | Lifetime |
-|--------|---------|----------|
-| `main` | Stable torch-spyre codebase. All work merges here. | Permanent |
-| `profiler/<task-name>` | Individual task branches. One per developer per task. | Short-lived (days) |
+| Remote | URL | Purpose |
+|--------|-----|---------|
+| `upstream` | `https://github.com/torch-spyre/torch-spyre` | Official repo. Never push directly. |
+| `origin` | `https://github.com/<your-username>/torch-spyre` | Your personal fork. All pushes go here. |
 
-The flow is: create task branch off `main` → do work → open PR into `main` → team review → merge.
+| Branch | Lives on | Lifetime |
+|--------|----------|----------|
+| `main` | upstream | Permanent — stable codebase |
+| `profiler/<task-name>` | your fork | Short-lived (days) |
+
+The flow is: fork upstream → clone your fork → create task branch → do work →
+push to fork → open PR into upstream `main` → team review → merge.
 
 ---
 
-## Step 1: Clone the Repository
+## Step 1: Fork and Clone
 
-If you haven't already, clone the repo:
+**Fork once.** Go to `https://github.com/torch-spyre/torch-spyre` and click
+**Fork**. This creates `https://github.com/<your-username>/torch-spyre`.
+
+**Clone your fork:**
 
 ```bash
-git clone https://github.com/torch-spyre/torch-spyre.git
+git clone https://github.com/<your-username>/torch-spyre.git
 cd torch-spyre
 ```
 
-Verify your remote:
+**Add the upstream remote:**
+
+```bash
+git remote add upstream https://github.com/torch-spyre/torch-spyre.git
+```
+
+Verify your remotes:
 
 ```bash
 git remote -v
-# origin  https://github.com/torch-spyre/torch-spyre.git (fetch)
-# origin  https://github.com/torch-spyre/torch-spyre.git (push)
+# origin    https://github.com/<your-username>/torch-spyre.git (fetch)
+# origin    https://github.com/<your-username>/torch-spyre.git (push)
+# upstream  https://github.com/torch-spyre/torch-spyre.git (fetch)
+# upstream  https://github.com/torch-spyre/torch-spyre.git (push)
 ```
 
 ---
 
 ## Step 2: Create Your Task Branch
 
-Before starting work on a task, always branch off the latest `main`:
+Before starting work on a task, sync your local `main` with upstream and
+create a task branch from it:
 
 ```bash
+git fetch upstream
 git checkout main
-git pull origin main
+git merge --ff-only upstream/main
 
 # Create your task branch
 git checkout -b profiler/api-module-scaffold
@@ -51,7 +72,8 @@ git checkout -b profiler/api-module-scaffold
 
 ### Naming Convention
 
-Use the pattern `profiler/<category>-<description>` where the category reflects what area of the profiler you're working on:
+Use the pattern `profiler/<category>-<description>` where the category
+reflects what area of the profiler you're working on:
 
 | Pattern | Example | Used For |
 |---------|---------|----------|
@@ -64,7 +86,8 @@ Use the pattern `profiler/<category>-<description>` where the category reflects 
 | `profiler/test-<description>` | `profiler/test-chrome-trace-export` | Test additions |
 | `profiler/fix-<description>` | `profiler/fix-fallback-no-libaiupti` | Bug fixes |
 
-Keep branch names short but descriptive. Someone reading `git branch -r` should understand what you're working on without opening the PR.
+Keep branch names short but descriptive. Someone reading `git branch -r`
+should understand what you're working on without opening the PR.
 
 ---
 
@@ -84,7 +107,8 @@ git commit -m "[profiler] Add profiler module scaffold with profile_spyre() wrap
 
 ### Commit Message Convention
 
-Prefix all profiler commits with `[profiler]` so they're easy to find in `git log`:
+Prefix all profiler commits with `[profiler]` so they're easy to find in
+`git log`:
 
 | Prefix | Example |
 |--------|---------|
@@ -93,7 +117,7 @@ Prefix all profiler commits with `[profiler]` so they're easy to find in `git lo
 | `[profiler][test]` | `[profiler][test] Add Tier 1 CPU-only profiler tests` |
 | `[profiler][docs]` | `[profiler][docs] Add profiling user guide` |
 
-Push your task branch to remote:
+Push your task branch to your fork:
 
 ```bash
 git push -u origin profiler/api-module-scaffold
@@ -103,11 +127,13 @@ git push -u origin profiler/api-module-scaffold
 
 ## Step 4: Keep Your Branch Up to Date (Rebase)
 
-torch-spyre is under active development. Before opening a PR (and periodically while working), rebase your branch onto the latest `main`:
+torch-spyre is under active development. Before opening a PR (and
+periodically while working), rebase your branch onto the latest upstream
+`main`:
 
 ```bash
-git fetch origin
-git rebase origin/main
+git fetch upstream
+git rebase upstream/main
 
 # If there are conflicts, resolve them, then:
 git add <resolved-files>
@@ -117,52 +143,59 @@ git rebase --continue
 git push --force-with-lease origin profiler/api-module-scaffold
 ```
 
-> **Note:** Use `--force-with-lease` (not `--force`). It's safer — it refuses to push if someone else pushed to your branch since your last fetch.
+> **Note:** Use `--force-with-lease` (not `--force`). It's safer — it refuses
+> to push if someone else pushed to your branch since your last fetch.
 
 **When to rebase:**
+
 - Before opening your PR
 - If your PR shows merge conflicts on GitHub
-- If `main` has received changes you depend on (e.g., C++ registration code you need)
+- If upstream `main` has received changes you depend on
 
 ---
 
 ## Step 5: Open a Pull Request
 
-On GitHub, open a PR from your task branch into `main`.
+On GitHub, open a PR from `<your-username>/torch-spyre:profiler/<task-name>`
+into `torch-spyre/torch-spyre:main`.
 
 ### PR Checklist
 
 - Title starts with `[profiler]`
 - Description explains what changed and why
-- Branch is rebased onto latest `main` (no merge conflicts)
+- Branch is rebased onto latest upstream `main` (no merge conflicts)
 - Tests pass (at minimum, Tier 1 CPU-only tests)
 - At least one profiling team member reviews before merge
 
 ### Keep PRs Small and Focused
 
-Each PR should do one thing. This makes reviews faster and reduces merge conflicts. Examples of good PR scope:
+Each PR should do one thing. This makes reviews faster and reduces merge
+conflicts. Examples of good PR scope:
 
 - `[profiler] Add profiler module scaffold with profile_spyre() wrapper` — one file, one feature
 - `[profiler][memory] Add memory_allocated() and memory_reserved() stubs` — related APIs together
 - `[profiler][test] Add Tier 1 CPU-only profiler tests` — tests for existing code
 
-Avoid PRs that mix unrelated changes (e.g., don't add memory APIs and trace enrichment in the same PR).
+Avoid PRs that mix unrelated changes (e.g., don't add memory APIs and trace
+enrichment in the same PR).
 
 ---
 
 ## Step 6: After Merge, Clean Up
 
-Once your PR is merged, delete your task branch:
+Once your PR is merged, sync your fork's `main` and delete the task branch:
 
 ```bash
-# Switch back to main and pull the merged changes
+# Sync your local main with upstream
+git fetch upstream
 git checkout main
-git pull origin main
+git merge --ff-only upstream/main
+git push origin main
 
 # Delete the local branch
 git branch -d profiler/api-module-scaffold
 
-# Delete the remote branch (or use GitHub's "Delete branch" button)
+# Delete the branch on your fork (or use GitHub's "Delete branch" button)
 git push origin --delete profiler/api-module-scaffold
 ```
 
@@ -172,30 +205,36 @@ Then start your next task from Step 2.
 
 ## Daily Workflow Summary
 
-1. **Start of day:** pull the latest main
-   ```bash
-   git checkout main
-   git pull origin main
-   ```
+**1. Start of day** — sync with upstream main:
 
-2. **Switch to your task branch** (or create a new one):
-   ```bash
-   git checkout profiler/<your-task>
-   git rebase origin/main
-   ```
+```bash
+git fetch upstream
+git checkout main
+git merge --ff-only upstream/main
+```
 
-3. **Work:** make changes, commit often with `[profiler]` prefix
-   ```bash
-   git add .
-   git commit -m "[profiler] <clear description of what changed>"
-   ```
+**2. Switch to your task branch** (or create a new one):
 
-4. **End of day:** push your branch
-   ```bash
-   git push origin profiler/<your-task>
-   ```
+```bash
+git checkout profiler/<your-task>
+git rebase upstream/main
+```
 
-5. **When task is done:** rebase onto latest main, then open PR into `main` on GitHub
+**3. Work** — make changes, commit often with `[profiler]` prefix:
+
+```bash
+git add .
+git commit -m "[profiler] <clear description of what changed>"
+```
+
+**4. End of day** — push your branch to your fork:
+
+```bash
+git push origin profiler/<your-task>
+```
+
+**5. When task is done** — rebase onto latest upstream main, then open PR
+from your fork into `torch-spyre/torch-spyre:main` on GitHub.
 
 ---
 
@@ -203,7 +242,8 @@ Then start your next task from Step 2.
 
 ### "Rebase has conflicts"
 
-This is normal when `main` changes files you also touched. Resolve each conflict, then:
+This is normal when upstream `main` changes files you also touched. Resolve
+each conflict, then:
 
 ```bash
 git add <resolved-files>
@@ -218,26 +258,28 @@ git rebase --abort
 
 ### "I need changes that another team member just merged"
 
-Pull the latest main and rebase your branch:
+Fetch upstream and rebase your branch:
 
 ```bash
-git fetch origin
-git rebase origin/main
+git fetch upstream
+git rebase upstream/main
 ```
 
 Their changes will be available immediately.
 
 ### "Someone else is working on the same file"
 
-Communicate. Our files are relatively isolated (`torch_spyre/profiler/` is new), but if you're both editing the same function, coordinate via Slack first. Keep PRs small and merge them quickly to minimize overlap.
+Communicate. Our files are relatively isolated (`torch_spyre/profiler/` is
+new), but if you're both editing the same function, coordinate via Slack
+first. Keep PRs small and merge them quickly to minimize overlap.
 
 ### "My PR is stuck in review and main has moved ahead"
 
-Rebase onto the latest main to keep your PR mergeable:
+Rebase onto the latest upstream main to keep your PR mergeable:
 
 ```bash
-git fetch origin
-git rebase origin/main
+git fetch upstream
+git rebase upstream/main
 git push --force-with-lease origin profiler/<your-task>
 ```
 
@@ -245,7 +287,8 @@ git push --force-with-lease origin profiler/<your-task>
 
 ## Our Files (Agreed Directory Structure)
 
-All profiling work lives in these directories. This was coordinated with the torch-spyre maintainers to avoid collisions:
+All profiling work lives in these directories. This was coordinated with the
+torch-spyre maintainers to avoid collisions:
 
 ```
 torch-spyre/
@@ -265,4 +308,7 @@ torch-spyre/
     └── profiling.md           # NEW — user guide
 ```
 
-> **Note:** `torch_spyre/csrc/profiler/` contains C++ registration and build system work. `torch_spyre/profiler/` contains Python APIs, trace enrichment, and user-facing code. `tests/`, `examples/`, and `docs/` are shared across the team.
+> **Note:** `torch_spyre/csrc/profiler/` contains C++ registration and build
+> system work. `torch_spyre/profiler/` contains Python APIs, trace enrichment,
+> and user-facing code. `tests/`, `examples/`, and `docs/` are shared across
+> the team.
