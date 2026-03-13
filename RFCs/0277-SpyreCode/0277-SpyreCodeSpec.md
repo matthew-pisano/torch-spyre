@@ -17,84 +17,79 @@ This document describes `SpyreCode` the artifacts produced by the Deeptools back
 The execution of a computation kernel on the Spyre device is referred to as a <u>job</u>. The <u>computation kernel</u>  comprises of sequence of operations, uses dynamic shapes with input/output tensors resident on host or device. Job execution on Spyre involves a combination of executing programs on Spyre cores (using a compute control block) and transfers between host &#8660; Spyre (using a DMA control block). Jobs executed on Spyre use a (maximum) 128GB virtual address space, split into 8 segments each having a maximum length of 16GB.
 
 ### Components of `SpyreCode`
-`SpyreCode` facilites the runtime to execute a job on Spyre. It comprises of 3 components:
-* Job plan
-* Job Binary a.k.a. `init.bin`
-* Host Compute Metadata
+`SpyreCode` facilitates the runtime to execute a job on Spyre. The compiler produces a self-contained `JobPlan` — an ordered sequence of `RuntimeOperation` steps. Each step carries all the metadata it needs for execution: binary paths, correction metadata, device addresses, and allocation sizes. The three categories of information previously represented as standalone components (Job Binary, Host Compute Metadata) are now properties on individual steps within the JobPlan:
 
-<p align="center">
-  <img src="spyrecode_content.png" alt="spyrecode_content" width="350"/>
-</p>
-<p align="center">
-  Figure 1. Components of `SpyreCode`
-</p>  
+* **Job Binary**: Referenced by `binary_path` on the `ComputeOnDevice` step. The runtime (SpyreStream) is responsible for loading the binary to device during JobPlan loading.
+* **Host Compute Metadata**: Embedded as `program_correction_metadata` on the `ProgramCorrection` step.
+* **Allocation sizes**: Specified on the `ComputeOnDevice` step, telling the runtime how much space to allocate in segment 7 for the binary, correction data, and intermediate tensors.
 
-In the virtual address space corresponding to a job, the last segment (SegmentId=7) is **reserved for use by `SpyreCode`**. This excludes SegmentId=7 from being used for data tensors allocated by user-code (using .to() operation) or by compiler fronend (torch-inductor) generated code.
-
-The following sections detail the different components of `SpyreCode`.
+Segment 7 is **reserved for use by `SpyreCode`**. This excludes segment 7 from being used for data tensors allocated by user-code (using .to() operation) or by compiler frontend (torch-inductor) generated code. The runtime manages segment 7 allocation internally — the JobPlan specifies the required sizes, and SpyreStream allocates the space via SpyreAllocator during loading.
 
 ### Job Plan
 
-The Job plan is a JSON object containing a list of commands (List\<JobPlanCommand\>). The runtime executes the commands in sequence to complete the execution of the job. Each command in the job plan is comprised of a command type and its associated attributes.
+The Job plan is an ordered sequence of `RuntimeOperation` steps. The compiler produces the JobPlan directly as shared objects that the runtime consumes. Each step is self-contained, carrying all the metadata it needs for execution. The runtime executes the steps in sequence to complete the execution of the job.
 
-The command types in `JobPlanCommand` and their attributes are explained below:
-* `ComputeOnHost`: Triggers execution of a predefined host function API. Its attributs are:
-  * `ihandle`: A handle for the input tensor used as input to the host function. If the Job has runtime input arguments (e.g., a kernel with symbolic start addresses), then those input arguments are concatenated to form a meta tensor called `iargs`. The host function will use meta tensor as its input `ihandle=iargs`. NOTE: While the command attribute describes the tensor using a handle, the host function itself will take a pointer or reference to that tensor so as to process its contents during execution.
-  * `ishape`: Shape of the tensor fed to `ihandle`
-  * `ohandle`: A handle for the output tensor produced by the host function API. This output tensor could be transferred to the device or fed to another host function.
-  * `oshape`: Shape of the tensor fed to `ohandle`
-  * `hcm`: A json object that contains metadata needed by the host function for its processing. This json object is produced by the backend compiler as part of `SpyreCode`
-* `ComputeOnDevice`: Triggers execution of computation on Sypre Cores. This is achieved by runtime sending a control message to the card firmware which generates a compute control block (CB). Its attributes are:
-  * `job_bin_ptr`: Starting virtual address of the job binary (limited to SegmentId=7). Spyre requires start address to be a multiple of 128B.
-* `DataTransfer`: Triggers a data transfer between host and Sypre.The runtime sends a control message to the card firmare to generate a DMAI or DMAO control block to effect the transfer. Its attributes are:
-  * `direction`: `0` indicates transfer to device and `1` indicates transfer from device
-  * `host_handle`: A handle for the tensor on the host side.
-  * `size`: Size of the data transfer (in Bytes)
-  * `dev_ptr`: Starting virtual address where the tensor resides in the device (limited to SegmentId=7). Spyre requires start address to be a multiple of 128B.
-* `Allocate`: Requests the runtime to allocate space on the device memory. From a virtual address point-of-view, the space is allocated in SegmentId=7 starting from address 0. The 3 uses of the space are: (a) to store the job binary (programs that will run on Spyre cores), (b) to store data needed to effect program correction supporting symbolic start address and tensor/compute shapes and (c) (if required) intermediate data tensors that are allocated in the device memory during backend compilation.
-  * `size`: Size of allocation (in Bytes)
+The step types and their attributes are explained below:
+* `ProgramCorrection`: A host-side operation that performs program correction. When a kernel uses symbolic addresses or shapes, the backend compiler produces correction metadata describing how symbol values map to corrections in the job binary. At runtime, this step takes resolved symbol values and the correction metadata as input and produces a correction tensor. Its attributes are:
+  * `function`: The host function that performs program correction.
+  * `program_correction_metadata`: Metadata needed by the host function for its processing (e.g., how input arguments/symbols must be interpreted in the context of the job binary — mapping a symbolic dimension size to a loop count correction in the binary). This is produced by the backend compiler as part of `SpyreCode`.
+
+  Note: Unlike the previous `ComputeOnHost` command which carried explicit input/output handles and shapes (`ihandle`, `ishape`, `ohandle`, `oshape`), `ProgramCorrection` does not need these. The inputs to the host function (resolved symbol values — tensor addresses and shape values) are provided by the runtime (SpyreStream) at launch time from the `CompositeAddress` values on the SpyreTensors, not from the step itself. The output correction tensor buffer is pre-allocated by the runtime using the `breakdown_correctiondata` size from the associated `ComputeOnDevice` step. The `program_correction_metadata` tells the function how to interpret the inputs and produce the output of the correct size and layout.
+* `ComputeOnDevice`: Triggers execution of computation on Spyre Cores. This is achieved by the runtime sending a control message to the card firmware which generates a compute control block (CB). Its attributes are:
+  * `binary_path`: Path to the compiled binary produced by the backend compiler. This single binary may internally contain both a program correction program and the compute program.
+  * `expected_input_shapes`: The compiled tensor shapes, used by the runtime to detect tiling requirements (when actual tensor shapes exceed the compiled tile size).
+  * `allocation_size`: Total size (in Bytes) of the segment 7 allocation needed for this binary. The runtime allocates this space during JobPlan loading. The allocation is a single contiguous block that holds the program binary (at offset 0), and conditionally includes space for program correction tensors and intermediate data tensors.
   * `breakdown_jobbinary`: Size of job binary (in Bytes)
-  * `breakdown_correctiondata`: Size of the data needed for program correction owing to symbolic start address and shapes (in Bytes)
+  * `breakdown_correctiondata`: Size of the data needed for program correction owing to symbolic start addresses and shapes (in Bytes)
   * `breakdown_tensordata`: Size of intermediate data tensors that spilled over to device memory (in Bytes)
+  * `composite_address`: Set by the runtime after the binary is loaded to device (not specified by the compiler). A `CompositeAddress` identifying where the binary resides on device.
+* `H2D`: Triggers a data transfer from host to Spyre. The runtime sends a control message to the card firmware to generate a DMAI control block to effect the transfer. Its attributes are:
+  * `host_address`: Address of the tensor data on the host side. Set by the runtime at launch time (not specified by the compiler).
+  * `device_address`: A `CompositeAddress` identifying where the tensor resides on the device. Set by the runtime at launch time (not specified by the compiler).
+  * `size`: Size of the data transfer (in Bytes)
+* `D2H`: Triggers a data transfer from Spyre to host. The runtime sends a control message to the card firmware to generate a DMAO control block to effect the transfer. Its attributes are:
+  * `device_address`: A `CompositeAddress` identifying where the tensor resides on the device. Set by the runtime at launch time (not specified by the compiler).
+  * `host_address`: Address of the tensor data on the host side. Set by the runtime at launch time (not specified by the compiler).
+  * `size`: Size of the data transfer (in Bytes)
 
-### Job Binary a.k.a. `init.bin`
+### Job Binary
 
-The `init.bin` is a binary file (not in text format) that contains all programs for the kernel. The runtime is responsible for transferring the job binary from host to the Spyre device’s memory. The job binary is required to be placed at virtual address \<SegmentId=7, address 0\>.
+The job binary is a binary file (not in text format) that contains all programs for the kernel. It is referenced by the `binary_path` attribute on the `ComputeOnDevice` step. The runtime (SpyreStream) is responsible for loading the binary to the Spyre device’s memory during JobPlan loading — it allocates a contiguous block in segment 7 via SpyreAllocator (using the `allocation_size` from the `ComputeOnDevice` step), transfers the binary via a DMA operation, and stores the resulting `CompositeAddress` on the step. The binary is placed at offset 0 within the allocated block.
 
-### Host Compute metadata:
+### Program Correction Metadata
 
-The host compute metadata is provided as an input to the `ComputeOnHost` job command. It contains information needed to process the input tensor produce an output tensor that can then be transferred to the device. An example of the use of host compute metadata in the context of kernel execution with symbolic start address and shapes is described in
-[example](#example2-job-plan-with-program-correction) below.
+The program correction metadata is carried directly on the `ProgramCorrection` step (as the `program_correction_metadata` attribute). It contains information needed by the host function to interpret resolved symbol values and produce a correction tensor that can then be transferred to the device. An example of the use of program correction metadata in the context of kernel execution with symbolic start addresses and shapes is described in [example](#example2-job-plan-with-program-correction) below.
 
 ### Execution Flow Examples
 
 #### Example1: Job plan for execution of a kernel with fixed tensor addresses and shapes
 
 ```
-1. Allocate size=49152, breakdown_jobbinary=32768, breakdown_correctiondata=0, breakdown_tensordata=16384
-2. ComputeOnDevice job_bin_ptr=0x1C00000000
+steps:
+  1. ComputeOnDevice(binary_path="kernel.bin", expected_input_shapes=[[1024, 1024]],
+       allocation_size=49152, breakdown_jobbinary=32768, breakdown_correctiondata=0, breakdown_tensordata=16384)
 ```
 
-In this example, the compute kernel has tensors with fixed addresses and shapes. In this case, the job plan in `SpyreCode` comprises of a sequence of 2 commands, an `Allocate` and a `ComputeOnDevice`. The `Allocate` indicates total amount of memory the needs to be reserved in SegmentId=7. In this example, a total of 49512 bytes is shown in the `size` attribute. The command further provides a breakdown of the 49512 bytes into 32768 bytes used to store the job binary (`breakdown_jobbinary`) and 16384 bytes used to hold an intermediate data tensor (`breakdown_tensordata`). The `ComputeOnDevice` launches execution on Spyre with the job binary located at a virtual address of 0x1C00000000.
+In this example, the compute kernel has tensors with fixed addresses and shapes. The job plan comprises a single `ComputeOnDevice` step. The `allocation_size` indicates the total amount of memory that needs to be reserved in segment 7 — in this example, 49152 bytes, broken down into 32768 bytes for the job binary (`breakdown_jobbinary`) and 16384 bytes for an intermediate data tensor (`breakdown_tensordata`). The runtime allocates this space during JobPlan loading, loads the binary to device, and stores the resulting `CompositeAddress` on the step. At launch time, the runtime constructs a compute control block and dispatches the binary.
 
 #### Example2: Job plan for execution of a kernel with symbolic tensor addresses and shapes
 
-This ia a more complex example, wherein the compute kernel has tensors with symbolic start addresses and shapes. The symbol values are known only during kernel invocation and can change across consecutive lauches of the same kernel. They are fed as input arguments when the kernel is invoked.
+This is a more complex example, wherein the compute kernel has tensors with symbolic start addresses and shapes. The symbol values are known only during kernel invocation and can change across consecutive launches of the same kernel. They are fed as input arguments when the kernel is invoked.
 
 With symbolic tensor address/shapes, the job binary produced by the backend compiler cannot be executed as-is on the hardware. It needs to be edited just-in-time knowing the symbol values. This process is referred to as *program correction*. It is accomplished using the following job plan.
 
 ```
-1. Allocate size=51200, breakdown_jobbinary=32768, breakdown_correctiondata=2048, breakdown_tensordata=16384
-2. ComputeOnHost ihandle=iargs, ishape=[4], ohandle=T1, oshape=[16 128], hcm=hcm.json
-3. DataTransfer direction=0 host_handle=T1 size=2048 dev_ptr=0x1C00008000
-4. ComputeOnDevice job_bin_ptr=0x1C00000000
+steps:
+  1. ProgramCorrection(function=correct_fn, program_correction_metadata=hcm.json)
+  2. H2D(host_address=<correction_tensor>, device_address=<seg7 offset>, size=2048)
+  3. ComputeOnDevice(binary_path="kernel.bin", expected_input_shapes=[[1024, 1024]],
+       allocation_size=51200, breakdown_jobbinary=32768, breakdown_correctiondata=2048, breakdown_tensordata=16384)
 ```
 
-In this case, the job plan comprises of 4 commands.
-* The first command is `Allocate` where 51200 bytes of data is requested, 32768 bytes for the job binary, 16384 bytes for tensor data and an additional 2048 bytes for storing data needed for program correction.
-* The second command is to execute a host function `ComputeOnHost`, which takes the input arguments (4 in this case) and the host compute metadata (*hcm.json*) as its inputs, and produces a data tensor (T1) needed for program correction. The *hcm.json* contains information pertaining to how the input arguments (symbols) must be interpreted in the context of the job binary. For example, if a shape of a dimension in a tensor is symbolic during compilation, then its value (provided as part of input arguments) will be used to correct one of loop counts in the job binary.
-* The third command transfers T1 to the device to a specific location indicated by the *dev_ptr*
-* Finally, the last command executes the job binary. In this case, the job binary contains additional program instructions (which are executed on Sypre core) to first read T1 and make corrections to future program instructions. Then the corrected program instructions are executed (on Spyre cores), successfully completing the kernel execution with the desired tensor address/shape.
+In this case, the job plan comprises 3 steps.
+* The first step is `ProgramCorrection`, which performs a host-side computation. At launch time, the runtime (SpyreStream) provides the resolved symbol values (tensor addresses and shape values from the SpyreTensors' `CompositeAddress` values) to the host function, along with the `program_correction_metadata` (*hcm.json*). The metadata contains information pertaining to how the symbols must be interpreted in the context of the job binary. For example, if a shape of a dimension in a tensor is symbolic during compilation, then its value will be used to correct one of the loop counts in the job binary. The host function produces a correction tensor, which the runtime writes to a pre-allocated buffer (sized according to `breakdown_correctiondata` from the `ComputeOnDevice` step).
+* The second step is `H2D`, which transfers the correction tensor to a reserved location on device within the segment 7 program allocation (at a compiler-specified offset after the program binary). The `host_address` and `device_address` are populated by the runtime at launch time.
+* The third step is `ComputeOnDevice`, which launches the unified binary. The binary internally contains both a correction program and the compute program — the correction program reads the correction tensor to patch the compute program, then the compute program executes, successfully completing the kernel execution with the desired tensor address/shape. The `allocation_size` (51200 bytes) breaks down into 32768 bytes for the job binary, 2048 bytes for correction data, and 16384 bytes for intermediate tensor data.
 
 ## **Metrics **
 
