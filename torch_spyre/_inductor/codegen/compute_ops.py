@@ -25,6 +25,11 @@ from torch_spyre._inductor.constants import (
 )
 
 
+def swap_last_two_elements(x: list):
+    assert len(x) >= 2
+    return x[:-2] + x[-1:] + x[-2:-1]
+
+
 class DimInfo:
     def __init__(self, index: int, fields: dict = {}):
         self.index = index
@@ -430,7 +435,7 @@ def gen_coord_info_value(
 
 
 def create_padding_mask_info(
-    dim_infos: DimInfos, kwargs, tensor, reduction
+    dim_infos: DimInfos, kwargs, tensor, reduction, op
 ) -> tuple[dict, int]:
     coordinateMasking = {}
     maskingConstId = -1
@@ -443,7 +448,14 @@ def create_padding_mask_info(
             if di.padding > 0:
                 coordinateMasking[di.label] = [[di.unpadded_size, di.padding]]
         if coordinateMasking:
-            maskingConstId = add_constant(kwargs, "samv-maskvalue", 0)
+            # Select mask value based on operation
+            if op == "max":
+                maskvalue = float("-inf")
+            elif op == "min":
+                maskvalue = float("inf")
+            else:
+                maskvalue = 0
+            maskingConstId = add_constant(kwargs, "samv-maskvalue", maskvalue)
 
     return coordinateMasking, maskingConstId
 
@@ -543,7 +555,7 @@ def generate_sfp_op(pointers, *, op, dimensions, inputs, outputs, reduction, **k
     )
 
     coordinateMasking, maskingConstId = create_padding_mask_info(
-        dim_infos, kwargs, tensors[-1], reduction
+        dim_infos, kwargs, tensors[-1], reduction, op
     )
     layouts = create_tensor_specific_layouts(
         tensors, dim_infos, op, op_dims_tensor=op_dims_tensor
@@ -763,7 +775,6 @@ def _generate_matmul_common(
     dim_labels,
     dim_indices,
     dim_splits,
-    coreid_to_wk_slice,
     cores,
 ):
     """
@@ -801,6 +812,14 @@ def _generate_matmul_common(
     )
 
     layouts = create_tensor_specific_layouts(tensors, dim_infos, op, is_matmul=True)
+
+    # swap_last_two_elements moves the "in" (reduction) dimension to the last
+    # so that the core assignment keeps partial sum results that require cross-core
+    # communications close
+    coreid_to_wk_slice = calculate_core_to_slice_mapping(
+        swap_last_two_elements(dim_labels),
+        swap_last_two_elements(dim_splits),
+    )
 
     return {
         op: {
@@ -990,8 +1009,6 @@ def generate_matmul(pointers, *, op, dimensions, inputs, outputs, **kwargs):
         if "op_dim_splits" in kwargs["op_info"]:
             dim_splits = list(kwargs["op_info"]["op_dim_splits"])
 
-    coreid_to_wk_slice = calculate_core_to_slice_mapping(dim_labels, dim_splits)
-
     return _generate_matmul_common(
         pointers,
         op=op,
@@ -1001,7 +1018,6 @@ def generate_matmul(pointers, *, op, dimensions, inputs, outputs, **kwargs):
         dim_labels=dim_labels,
         dim_indices=dim_indices,
         dim_splits=dim_splits,
-        coreid_to_wk_slice=coreid_to_wk_slice,
         cores=cores,
     )
 
@@ -1031,8 +1047,6 @@ def generate_bmm(pointers, *, op, dimensions, inputs, outputs, **kwargs):
         if "op_dim_splits" in kwargs["op_info"]:
             dim_splits = list(kwargs["op_info"]["op_dim_splits"])
 
-    coreid_to_wk_slice = calculate_core_to_slice_mapping(dim_labels, dim_splits)
-
     return _generate_matmul_common(
         pointers,
         op=op,
@@ -1042,6 +1056,5 @@ def generate_bmm(pointers, *, op, dimensions, inputs, outputs, **kwargs):
         dim_labels=dim_labels,
         dim_indices=dim_indices,
         dim_splits=dim_splits,
-        coreid_to_wk_slice=coreid_to_wk_slice,
         cores=cores,
     )
