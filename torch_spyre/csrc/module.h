@@ -19,7 +19,7 @@
 #include <pybind11/pybind11.h>
 #include <torch/csrc/utils/pybind.h>
 
-#include <flex/runtime.hpp>
+#include <flex/runtime/runtime.hpp>
 #include <memory>
 
 namespace spyre {
