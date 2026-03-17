@@ -24,7 +24,7 @@
 #include <util/sendefs.h>
 
 #include <cstdlib>  // std::getenv
-#include <dee_internal/dee_graph_converter.hpp>
+#include <flex/compiler_interface/dee_graph_converter.hpp>
 #include <flex/runtime/flex_factory.hpp>
 #include <memory>
 #include <sendnn/graph.hpp>
