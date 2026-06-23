@@ -39,6 +39,7 @@ POINTWISE_UNARY_OPS_DICT = {
     "reciprocal": torch.reciprocal,
     "relu": torch.relu,
     "sign": torch.sign,
+    "silu": torch.ops.aten.silu,
     "sin": torch.sin,
     "tanh": torch.tanh,
 }
@@ -289,7 +290,7 @@ TO_DTYPE_OP_PARAMS_SETS = {
     )
     for src, dst in DtypeOpTable.get_dtype_pairs()
     for shape in TO_DTYPE_OP_SHAPES
-    if src != torch.bool and dst != torch.bool
+    if src not in (torch.bool, torch.float8_e4m3fn) and dst != torch.bool
 }
 
 
