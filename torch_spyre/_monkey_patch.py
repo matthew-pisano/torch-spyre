@@ -162,6 +162,7 @@ def _patch_tensor_for_spyre():
 
     def spyre_empty(
         *args,
+        size=None,
         device_layout=None,
         out=None,
         dtype=None,
@@ -171,6 +172,10 @@ def _patch_tensor_for_spyre():
         pin_memory=False,
         memory_format=torch.contiguous_format,
     ):
+        # torch.empty supports size as either a positional arg or keyword arg.
+        # Normalise so downstream always receives it as positional.
+        if size is not None and not args:
+            args = (size,)
         if (
             device_layout is None
         ):  # use original implementation if no layout is provided
