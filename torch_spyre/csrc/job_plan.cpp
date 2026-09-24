@@ -23,10 +23,8 @@
 #include <variant>
 #include <vector>
 
-#include "spyre_allocator.h"
 #include "spyre_composite_address.h"
 #include "spyre_stream.h"
-#include "spyrecode-host-functions/processSpyreCodeArtifacts.h"
 
 namespace spyre {
 
