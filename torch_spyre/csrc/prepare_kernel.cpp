@@ -508,7 +508,8 @@ std::unique_ptr<JobPlanStep> JobPlanBuilder::translateComputeOnHostWithH2D(
       compute_offset_address(job_allocation_.at(0), device_ptr, transfer_size);
 
   return std::make_unique<JobPlanStepHostCompute>(
-      correction_size, std::move(device_address), inp_ptr, std::move(ishape));
+      std::move(hcm_data), correction_size, std::move(device_address), inp_ptr,
+      std::move(ishape));
 }
 
 std::unique_ptr<JobPlanStep> JobPlanBuilder::translateDataTransfer(

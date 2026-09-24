@@ -29,6 +29,8 @@
 #include <variant>
 #include <vector>
 
+#include "spyrecode-host-functions/spyrecode.h"
+
 namespace spyre {
 
 // Forward declaration: JobPlanStep::construct() submits through SpyreStream
@@ -519,6 +521,8 @@ class JobPlanStepHostCompute final : public JobPlanStep {
   /**
    * @brief Construct host compute step (merged HC + H2D form).
    *
+   * @param hcm Compiler-provided metadata from deeptools (contains vdci and
+   *            senConstants describing how symbolic values must be interpreted)
    * @param correction_size Size of the correction blob in bytes (must equal
    *            device_address.total_size())
    * @param device_address Device CompositeAddress that receives the correction
@@ -527,7 +531,7 @@ class JobPlanStepHostCompute final : public JobPlanStep {
    *            Cases 2 and 3.
    * @param ishape used to discriminate case 2 (fake symbols)
    */
-  JobPlanStepHostCompute(size_t correction_size,
+  JobPlanStepHostCompute(std::unique_ptr<Hcm> hcm, size_t correction_size,
                          flex::CompositeAddress device_address,
                          const void* input_buffer, std::vector<int64_t> ishape)
       : correction_size_(correction_size),
@@ -535,6 +539,9 @@ class JobPlanStepHostCompute final : public JobPlanStep {
         input_buffer_(input_buffer),
         ishape_(std::move(ishape)) {
     pipeline_barrier_ = false;  // host-compute is overlap-eligible
+    // Create the host compute handle at construction time.
+    // This will internally create the fast_plan for deeptools.
+    handle_ = flex::createHostComputeHandle(std::move(hcm));
   }
 
   void construct(LaunchContext& ctx, const SpyreStream& stream) const override;
