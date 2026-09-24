@@ -534,7 +534,7 @@ class JobPlanStepHostCompute final : public JobPlanStep {
         device_address_(std::move(device_address)),
         input_buffer_(input_buffer),
         ishape_(std::move(ishape)) {
-    pipeline_barrier_ = false;  // host-produce is overlap-eligible
+    pipeline_barrier_ = false;  // host-compute is overlap-eligible
   }
 
   void construct(LaunchContext& ctx, const SpyreStream& stream) const override;

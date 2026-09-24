@@ -23,8 +23,6 @@
 #include <variant>
 #include <vector>
 
-#include "flex/memory_interface/raii_buffer.hpp"
-#include "flex/runtime_stream/operations/runtime_operation_host_produce.hpp"
 #include "spyre_allocator.h"
 #include "spyre_composite_address.h"
 #include "spyre_stream.h"
@@ -337,7 +335,7 @@ std::string checkJobPlanStepOrdering(const std::vector<StepKind>& kinds,
 
   // S_dev must BEGIN with Compute (leading-producer guarantee) and carry only
   // {Compute, D2H} (the device stream; see StreamRole in job_plan.h). No
-  // HostCompute/H2D -- host-produce steps belong on S_prep.
+  // HostCompute/H2D.
   {
     if (dev.empty() || dev[0] != StepKind::Compute) {
       return "S_dev ordering violation: device stream must begin with Compute, "
