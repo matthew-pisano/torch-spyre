@@ -64,7 +64,7 @@ void JobPlanStepD2H::construct(LaunchContext& ctx,
   } else {
     const uint64_t device_ptr = std::get<Dmva>(device_address_).value;
     const auto [segment_id, segment_offset, [[maybe_unused]] segment_type] =
-        decodeDevicePointer(device_ptr);
+        flex::decodeDevicePointer(device_ptr);
     TORCH_CHECK(segment_id < ctx.inputs_outputs.size(),
                 "D2H tensor-segment lookup out of range: segment ", segment_id,
                 " but only ", ctx.inputs_outputs.size(),
