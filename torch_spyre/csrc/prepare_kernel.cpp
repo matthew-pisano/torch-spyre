@@ -97,7 +97,7 @@ static flex::CompositeAddress compute_offset_address(
   TORCH_CHECK(job_allocation.chunks().size() == 1,
               "job_allocation must have 1 chunk");
 
-  const auto [[[maybe_unused]] segment_id, segment_offset, segment_type] =
+  const auto [segment_id, segment_offset, segment_type] =
       flex::decodeDevicePointer(dev_ptr);
   // Validate device pointer is within program segment bounds
   TORCH_CHECK(segment_type == flex::MemoryType::Program, "Device pointer 0x",
@@ -590,7 +590,7 @@ std::unique_ptr<JobPlanStep> JobPlanBuilder::translateDataTransfer(
       // in JobPlanStepH2D. If device_ptr is in tensor segments, store
       // device_ptr
       const auto segment_type =
-          std::get<2>(flex::decodeDevicePointer(job_bin_ptr));
+          std::get<2>(flex::decodeDevicePointer(device_ptr));
       if (segment_type == flex::MemoryType::Program) {
         // Compute CompositeAddress with offset from device_addr
         flex::CompositeAddress comp_addr = compute_offset_address(
