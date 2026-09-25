@@ -62,24 +62,25 @@ void JobPlanStepD2H::construct(LaunchContext& ctx,
     stream.launchD2H(params);
     flex::destroyDmaParams(params);
   } else {
-    const uint64_t dmva = std::get<Dmva>(device_address_).value;
-    auto segment_id = flex::dmvaToSegmentId(dmva);
-    TORCH_CHECK(segment_id < ctx.inputs_outputs.size(),
-                "D2H tensor-segment lookup out of range: segment ", segment_id,
-                " but only ", ctx.inputs_outputs.size(),
-                " launch args were provided");
-    const auto& tensor = ctx.inputs_outputs.at(segment_id);
+    const uint64_t device_ptr = std::get<Dmva>(device_address_).value;
+    const auto device_ptr_components = decodeDevicePointer(device_ptr);
+    TORCH_CHECK(device_ptr_components.first < ctx.inputs_outputs.size(),
+                "D2H tensor-segment lookup out of range: segment ",
+                device_ptr_components.first, " but only ",
+                ctx.inputs_outputs.size(), " launch args were provided");
+    const auto& tensor = ctx.inputs_outputs.at(device_ptr_components.first);
     const auto& tensor_address = *get_composite_address(tensor);
     TORCH_CHECK(tensor_address.chunks().size() == 1,
                 "Tensor address must have 1 chunk");
     const auto& base_chunk = tensor_address.chunks()[0];
-    uint64_t segment_offset = dmva - (segment_id << flex::SEGMENT_SIZE_BITS);
-    TORCH_CHECK(segment_offset + size_ <= tensor_address.total_size(),
-                "D2H transfer out of bounds: offset ", segment_offset,
-                " + size ", size_, " exceeds tensor allocation size ",
-                tensor_address.total_size());
-    flex::LogicalAddress offset_addr(base_chunk.addr.region_id,
-                                     base_chunk.addr.offset + segment_offset);
+    TORCH_CHECK(
+        device_ptr_components.second + size_ <= tensor_address.total_size(),
+        "D2H transfer out of bounds: offset ", device_ptr_components.second,
+        " + size ", size_, " exceeds tensor allocation size ",
+        tensor_address.total_size());
+    flex::LogicalAddress offset_addr(
+        base_chunk.addr.region_id,
+        base_chunk.addr.offset + ptr_components.second);
     flex::Chunk offset_chunk(offset_addr, size_, base_chunk.domain_id);
 
     // Create shared_ptr to manage lifetime - will be kept alive by callback
