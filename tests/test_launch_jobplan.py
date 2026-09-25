@@ -303,7 +303,9 @@ class TestSymbolicArg(TestCase):
 
             stream = torch.Stream("spyre")
             with stream:
-                with pytest.raises(RuntimeError, match="tensor_id=5 out of range"):
+                with pytest.raises(
+                    RuntimeError, match="symbolic_args tensor_id out of range"
+                ):
                     torch_spyre._C.launch_jobplan(job_plan, [t], symbolic_args=payload)
 
 
