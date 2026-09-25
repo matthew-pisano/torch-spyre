@@ -143,6 +143,8 @@ void JobPlanStepHostCompute::construct(LaunchContext& ctx,
         TORCH_CHECK(sym.tensor_id >= 0 && static_cast<size_t>(sym.tensor_id) <
                                               ctx.inputs_outputs.size(),
                     "symbolic_args tensor_id out of range");
+        TORCH_CHECK(sym.kind == SymbolicArgKind::kAddress,
+                    "SymbolicArgKind::kDimension is not yet implemented");
         args.push_back(
             get_composite_address(ctx.inputs_outputs[sym.tensor_id]));
       }
