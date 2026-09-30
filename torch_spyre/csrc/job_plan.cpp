@@ -170,13 +170,13 @@ void JobPlanStepHostCompute::construct(LaunchContext& ctx,
   auto* dmaParams = stream.launchHostCompute(params);
 
   try {
-    launchOperationH2D(dmaParams);
+    flex::launchOperationH2D(dmaParams);
   }
   catch (...) {
-    destroyDmaParams(dmaParams);
+    flex::destroyDmaParams(dmaParams);
     throw;
   }
-  destroyDmaParams(dmaParams);
+  flex::destroyDmaParams(dmaParams);
 }
 
 void JobPlanStepHostCompute::write(std::ostream& os) const {
