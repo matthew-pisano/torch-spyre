@@ -167,7 +167,16 @@ void JobPlanStepHostCompute::construct(LaunchContext& ctx,
     }
   } guard{params};
 
-  stream.launchHostCompute(params);
+  auto* dmaParams = stream.launchHostCompute(params);
+
+  try {
+    launchOperationH2D(dmaParams);
+  }
+  catch (...) {
+    destroyDmaParams(dmaParams);
+    throw;
+  }
+  destroyDmaParams(dmaParams);
 }
 
 void JobPlanStepHostCompute::write(std::ostream& os) const {
