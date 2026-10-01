@@ -170,7 +170,7 @@ void JobPlanStepHostCompute::construct(LaunchContext& ctx,
   auto* dmaParams = stream.launchHostCompute(params);
 
   try {
-    flex::launchOperationH2D(dmaParams);
+    stream.launchH2D(dmaParams);
   }
   catch (...) {
     flex::destroyDmaParams(dmaParams);
