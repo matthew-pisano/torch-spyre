@@ -67,7 +67,7 @@ class SpyreStream {
   void fillAsync(const flex::CompositeAddress* dst, double value,
                  DataFormats dtype, bool use_dmai) const;
   // Host-side compute for deeptools host compute calls.
-  flex::DmaParams* launchHostCompute(flex::HostComputeParams*) const;
+  flex::HostComputeBuffer* launchHostCompute(flex::HostComputeParams*) const;
 
   // Conversions
   c10::Stream unwrap() const;

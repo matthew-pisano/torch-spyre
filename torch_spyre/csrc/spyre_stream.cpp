@@ -273,7 +273,7 @@ void SpyreStream::fillAsync(const flex::CompositeAddress* dst, double value,
   resolveRuntimeHandle()->fillAsync(dst, value, dtype, use_dmai);
 }
 
-flex::DmaParams* SpyreStream::launchHostCompute(
+flex::HostComputeBuffer* SpyreStream::launchHostCompute(
     flex::HostComputeParams* params) const {
   RECORD_FUNCTION("launch::HostCompute", {});
   return resolveRuntimeHandle()->launchHostCompute(params);
