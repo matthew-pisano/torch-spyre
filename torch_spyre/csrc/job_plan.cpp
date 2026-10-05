@@ -169,25 +169,34 @@ void JobPlanStepHostCompute::construct(LaunchContext& ctx,
 
   auto* hostBuffer = stream.launchHostCompute(params);
 
+  // Create a managed shared_ptr to ensure the host buffer's lifetime is tied to
+  // callback destruction.
+  auto managed = std::shared_ptr<flex::HostComputeBuffer>(
+      hostBuffer, [](flex::HostComputeBuffer* buff) {
+        flex::destroyHostComputeBuffer(buff);
+      });
+
   // Create DmaParams to transfer the host buffer.
   auto* dmaParams =
       flex::createDmaParams(hostBuffer->data(), hostBuffer->size(),
                             /*to_device=*/true, &device_address_);
 
-  // Keep the buffer alive until the DMA completion callback fires.
-  dmaParams->callback = [hostBuffer](void*) {
-    flex::destroyHostComputeBuffer(hostBuffer);
-  };
+  // The managed buffer is freed when the callback is destroyed, which happens
+  // after the DMA completes or is cancelled.
+  dmaParams->callback = [managed](void*) {};
 
   try {
     stream.launchH2D(dmaParams);
   }
   catch (...) {
-    flex::destroyHostComputeBuffer(hostBuffer);
     flex::destroyDmaParams(dmaParams);
     throw;
   }
   flex::destroyDmaParams(dmaParams);
+
+  // managed goes out of scope here, leaving the callback with the only
+  // remaining reference to the host buffer. The buffer will be freed when the
+  // callback is destroyed.
 }
 
 void JobPlanStepHostCompute::write(std::ostream& os) const {
