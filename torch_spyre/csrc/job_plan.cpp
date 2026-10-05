@@ -174,10 +174,16 @@ void JobPlanStepHostCompute::construct(LaunchContext& ctx,
       flex::createDmaParams(hostBuffer->data(), hostBuffer->size(),
                             /*to_device=*/true, &device_address_);
 
+  // Keep the buffer alive until the DMA completion callback fires.
+  dmaParams->callback = [hostBuffer](void*) {
+    flex::destroyHostComputeBuffer(hostBuffer);
+  };
+
   try {
     stream.launchH2D(dmaParams);
   }
   catch (...) {
+    flex::destroyHostComputeBuffer(hostBuffer);
     flex::destroyDmaParams(dmaParams);
     throw;
   }
