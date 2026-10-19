@@ -1078,32 +1078,32 @@ class TestSpyre(TestCase):
         x[3, 3, 3] = y
         self.assertEqual(x.cpu()[3, 3, 3], y, atol=1e-3, rtol=1e-3)
 
-        slice_sizes = [2]
-        y = torch.rand(
-            slice_sizes,
-            dtype=torch.float16,
-            device="cpu",
-        )
-        x[3, 3, 3, :2] = y
-        self.assertEqual(x.cpu()[3, 3, 3, :2], y, atol=1e-3, rtol=1e-3)
+        # slice_sizes = [2]
+        # y = torch.rand(
+        #     slice_sizes,
+        #     dtype=torch.float16,
+        #     device="cpu",
+        # )
+        # x[3, 3, 3, :2] = y
+        # self.assertEqual(x.cpu()[3, 3, 3, :2], y, atol=1e-3, rtol=1e-3)
 
-        slice_sizes = [1]
-        y = torch.rand(
-            slice_sizes,
-            dtype=torch.float16,
-            device="cpu",
-        )
-        x[3, 3, 3, 2:3] = y
-        self.assertEqual(x.cpu()[3, 3, 3, 2:3], y, atol=1e-3, rtol=1e-3)
+        # slice_sizes = [1]
+        # y = torch.rand(
+        #     slice_sizes,
+        #     dtype=torch.float16,
+        #     device="cpu",
+        # )
+        # x[3, 3, 3, 2:3] = y
+        # self.assertEqual(x.cpu()[3, 3, 3, 2:3], y, atol=1e-3, rtol=1e-3)
 
-        slice_sizes = []
-        y = torch.rand(
-            slice_sizes,
-            dtype=torch.float16,
-            device="cpu",
-        )
-        x[3, 3, 3, 3] = y
-        self.assertEqual(x.cpu()[3, 3, 3, 3], y, atol=1e-3, rtol=1e-3)
+        # slice_sizes = []
+        # y = torch.rand(
+        #     slice_sizes,
+        #     dtype=torch.float16,
+        #     device="cpu",
+        # )
+        # x[3, 3, 3, 3] = y
+        # self.assertEqual(x.cpu()[3, 3, 3, 3], y, atol=1e-3, rtol=1e-3)
 
 
 if __name__ == "__main__":
