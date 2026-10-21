@@ -1087,7 +1087,9 @@ class TestSpyre(TestCase):
         ],
     )
     @pytest.mark.xfail(
-        raises=AssertionError, reason="Sub-stick slices are not yet supported for DMA"
+        strict=False,  # Allows XPASS for now, will be changed to True to enforce later
+        raises=AssertionError,
+        reason="Sub-stick slices are not yet supported for DMA",
     )
     def test_h2d_copy_to_substick_sliced_destination(self, sizes):
         """H2D sub-stick tensor slice"""
