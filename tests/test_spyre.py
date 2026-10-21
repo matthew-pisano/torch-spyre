@@ -1086,7 +1086,9 @@ class TestSpyre(TestCase):
             [9, 15, 35, 100],
         ],
     )
-    @pytest.mark.xfail(reason="Sub-stick slices are not yet supported for DMA")
+    @pytest.mark.xfail(
+        raises=AssertionError, reason="Sub-stick slices are not yet supported for DMA"
+    )
     def test_h2d_copy_to_substick_sliced_destination(self, sizes):
         """H2D sub-stick tensor slice"""
         x = torch.rand(
